@@ -79,7 +79,7 @@
   (connect config))
 
 (defn req->timepoint [{:keys [params] :as req}]
-  (let [as-of-param (bread/config req :datastore/as-of-param)
+  (let [as-of-param (bread/config req :datastore/as-of-param :as-of)
         as-of (get params as-of-param)]
     (when as-of
       (try
@@ -95,13 +95,16 @@
       @conn)))
 
 (defn datahike-plugin [config]
-  (let [{:keys [as-of-param datahike]} config]
+  (let [{:keys [as-of-param datahike]} config
+        ;; Support shorthands for (bread/add-hook :hook/datastore*)
+        ->timepoint (:req->timepoint config req->timepoint)
+        ->datastore (:req->datastore config req->datastore)]
     (fn [app]
       (-> app
           (bread/set-config :datastore/connection (connect datahike))
           (bread/set-config :datastore/as-of-param (or as-of-param :as-of))
-          (bread/add-hook :hook/datastore.req->timepoint req->timepoint)
-          (bread/add-hook :hook/datastore req->datastore)))))
+          (bread/add-hook :hook/datastore.req->timepoint ->timepoint)
+          (bread/add-hook :hook/datastore ->datastore)))))
 
 
 (comment
