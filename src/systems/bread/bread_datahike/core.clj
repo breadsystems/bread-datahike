@@ -5,6 +5,18 @@
    [systems.bread.alpha.datastore :as store]))
 
 
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ;;                           ;;
+  ;;    Datastore Protocols    ;;
+ ;;                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;
+;; Implement Bread's core TemporalDatastore and
+;; TransactionalDatastoreConnection protocols
+;;
+
 (extend-protocol store/TemporalDatastore
   datahike.db.DB
   (as-of [store instant]
@@ -33,10 +45,21 @@
     (d/transact conn tx)))
 
 
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ;;                           ;;
+  ;;    Datastore Protocols    ;;
+ ;;                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;
+;; Implement Bread's core TemporalDatastore and
+;; TransactionalDatastoreConnection protocols
+;;
+
 (def ^:private created-dbs (atom {}))
 
 (defn connect [datahike-config]
-  ;; TODO detect if db exists?
   (try
     (let [db-id (get-in datahike-config [:store :id])]
       (when (nil? (get @created-dbs db-id))

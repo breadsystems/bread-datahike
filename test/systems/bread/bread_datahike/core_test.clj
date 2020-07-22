@@ -4,76 +4,90 @@
    [systems.bread.alpha.core :as bread]
    [systems.bread.alpha.datastore :as store]
    [systems.bread.bread-datahike.core :as plugin]
-   [clojure.test :refer [deftest is testing]]))
+   [clojure.test :refer [deftest is testing use-fixtures]]))
 
 
-(deftest test-datahike-datastore
-  (let [schema [{:db/ident :name
-                 :db/valueType :db.type/string
-                 :db/unique :db.unique/identity
-                 :db/index true
-                 :db/cardinality :db.cardinality/one}
-                {:db/ident :age
-                 :db/valueType :db.type/number
-                 :db/cardinality :db.cardinality/one}]
-        config {:store {:backend :mem :id "testdb"}
-                :initial-tx schema}
-        create-db (fn [conf]
-                    (d/delete-database conf)
-                    (d/create-database conf)
-                    (d/connect conf))
-        angela {:name "Angela" :age 76}
-        bobby {:name "Bobby" :age 84}
-        query-all '[:find ?n ?a
-                    :where
-                    [?e :name ?n]
-                    [?e :age ?a]]
-        init-db (fn []
-                  (let [conn (create-db config)]
-                    (store/transact conn [angela bobby])
-                    conn))]
 
-    (testing "it implements q (query)"
-      (let [conn (init-db)]
-        (is (= #{["Angela" 76] ["Bobby" 84]}
-               (store/q @conn query-all)))))
+;; Set up a bunch of boilerplate to share between tests.
+(let [config {:store {:backend :mem :id "testdb"}
+              :initial-tx [{:db/ident :name
+                            :db/valueType :db.type/string
+                            :db/unique :db.unique/identity
+                            :db/index true
+                            :db/cardinality :db.cardinality/one}
+                           {:db/ident :age
+                            :db/valueType :db.type/number
+                            :db/cardinality :db.cardinality/one}]}
 
-    (testing "it implements pull"
-      (let [conn (init-db)]
-        (is (= {:name "Angela" :age 76 :db/id 3}
-               (store/pull @conn '[*] [:name "Angela"])))))
+      datahike-fixture (fn [f]
+                         ;; Clean up after any prior failures, just in case.
+                         (d/delete-database config)
+                         (d/create-database config)
+                         (f)
+                         ;; Eagerly clean up after ourselves.
+                         (d/delete-database config))
 
-    (testing "it supports transact"
-      (let [conn (init-db)
-            result (store/transact conn [{:db/id [:name "Angela"] :age 99}])]
-        (is (instance? datahike.db.TxReport result))))
+      angela {:name "Angela" :age 76}
+      bobby {:name "Bobby" :age 84}
+      query-all '[:find ?n ?a
+                  :where
+                  [?e :name ?n]
+                  [?e :age ?a]]
+      init-db (fn []
+                (let [conn (d/connect config)]
+                  (store/transact conn [angela bobby])
+                  conn))]
 
-    (testing "it implements as-of"
-      (let [conn (init-db)
-            init-date (java.util.Date.)]
-        ;; Happy birthday, Angela!
-        (store/transact conn [{:db/id [:name "Angela"] :age 77}])
-        (is (= #{["Angela" 77] ["Bobby" 84]}
-               (store/q @conn query-all)))
-        (is (= #{["Angela" 76] ["Bobby" 84]}
-               (store/q (store/as-of @conn init-date) query-all)))))
+  ;; Start each test with a blank-slate database.
+  (use-fixtures :each datahike-fixture)
 
-    (testing "it implements history"
-      (let [conn (init-db)
-            query-ages '[:find ?a
-                         :where
-                         [?e :age ?a]
-                         [?e :name "Angela"]]]
-        (store/transact conn [{:db/id [:name "Angela"] :age 77}])
-        (store/transact conn [{:db/id [:name "Angela"] :age 78}])
-        (is (= #{[76] [77] [78]}
-               (store/q (store/history @conn) query-ages)))))
-    
-    (testing "it implements with"
-      (let [conn (init-db)
-            db (store/db-with @conn [{:db/id [:name "Angela"] :age 77}])]
-        (is (= {:name "Angela" :age 77 :db/id 3}
-               (store/pull db '[*] [:name "Angela"])))))))
+  (deftest test-q
+
+    (let [conn (init-db)]
+      (is (= #{["Angela" 76] ["Bobby" 84]}
+             (store/q @conn query-all)))))
+
+  (deftest test-pull
+
+    (let [conn (init-db)]
+      (is (= {:name "Angela" :age 76 :db/id 3}
+             (store/pull @conn '[*] [:name "Angela"])))))
+
+  (deftest test-transact
+
+    (let [conn (init-db)
+          result (store/transact conn [{:db/id [:name "Angela"] :age 99}])]
+      (is (instance? datahike.db.TxReport result))))
+
+  (deftest test-as-of
+
+    (let [conn (init-db)
+          init-date (java.util.Date.)]
+     ;; Happy birthday, Angela!
+      (store/transact conn [{:db/id [:name "Angela"] :age 77}])
+      (is (= #{["Angela" 77] ["Bobby" 84]}
+             (store/q @conn query-all)))
+      (is (= #{["Angela" 76] ["Bobby" 84]}
+             (store/q (store/as-of @conn init-date) query-all)))))
+
+  (deftest test-history
+
+    (let [conn (init-db)
+          query-ages '[:find ?a
+                       :where
+                       [?e :age ?a]
+                       [?e :name "Angela"]]]
+      (store/transact conn [{:db/id [:name "Angela"] :age 77}])
+      (store/transact conn [{:db/id [:name "Angela"] :age 78}])
+      (is (= #{[76] [77] [78]}
+             (store/q (store/history @conn) query-ages)))))
+
+  (deftest test-db-with
+
+    (let [conn (init-db)
+          db (store/db-with @conn [{:db/id [:name "Angela"] :age 77}])]
+      (is (= {:name "Angela" :age 77 :db/id 3}
+             (store/pull db '[*] [:name "Angela"]))))))
 
 
 (deftest test-datahike-plugin
