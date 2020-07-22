@@ -75,6 +75,9 @@
                        :message (.getMessage e)
                        :config datahike-config})))))
 
+(defmethod store/connect! :datahike [config]
+  (connect config))
+
 (defn req->timepoint [{:keys [params] :as req}]
   (let [as-of-param (bread/config req :datastore/as-of-param)
         as-of (get params as-of-param)]

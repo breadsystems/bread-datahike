@@ -7,9 +7,9 @@
    [clojure.test :refer [deftest is testing use-fixtures]]))
 
 
-
 ;; Set up a bunch of boilerplate to share between tests.
-(let [config {:store {:backend :mem :id "testdb"}
+(let [config {:datastore/type :datahike
+              :store {:backend :mem :id "testdb"}
               :initial-tx [{:db/ident :name
                             :db/valueType :db.type/string
                             :db/unique :db.unique/identity
@@ -34,7 +34,7 @@
                   [?e :name ?n]
                   [?e :age ?a]]
       init-db (fn []
-                (let [conn (d/connect config)]
+                (let [conn (store/connect! config)]
                   (store/transact conn [angela bobby])
                   conn))]
 

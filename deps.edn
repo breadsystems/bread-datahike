@@ -1,6 +1,6 @@
 {:paths ["src" "resources"]
  :deps {io.replikativ/datahike   {:mvn/version "0.3.1"}
-        systems.bread/bread-core {:mvn/version "0.3.0-alpha"}}
+        systems.bread/bread-core {:mvn/version "0.4.0-alpha"}}
  :aliases {:test
            {:extra-deps {lambdaisland/kaocha {:mvn/version "0.0-529"}}
             :main-opts ["-m" "kaocha.runner"]}
