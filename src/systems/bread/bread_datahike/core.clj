@@ -33,6 +33,8 @@
   datahike.db.AsOfDB
   (q [store query]
     (d/q query store))
+  (pull [store query ident]
+    (d/pull store query ident))
 
   datahike.db.HistoricalDB
   (q [store query]
