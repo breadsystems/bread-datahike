@@ -63,12 +63,16 @@
 
     (let [conn (init-db)
           init-date (java.util.Date.)]
-     ;; Happy birthday, Angela!
+      ;; Happy birthday, Angela!
       (store/transact conn [{:db/id [:name "Angela"] :age 77}])
       (is (= #{["Angela" 77] ["Bobby" 84]}
              (store/q @conn query-all)))
       (is (= #{["Angela" 76] ["Bobby" 84]}
-             (store/q (store/as-of @conn init-date) query-all)))))
+             (store/q (store/as-of @conn init-date) query-all)))
+
+      (testing "it composes with pull"
+        (let [db (store/as-of @conn init-date)]
+          (is (= 76 (:age (store/pull db '[:age] [:name "Angela"]))))))))
 
   (deftest test-history
 
@@ -87,7 +91,12 @@
     (let [conn (init-db)
           db (store/db-with @conn [{:db/id [:name "Angela"] :age 77}])]
       (is (= {:name "Angela" :age 77 :db/id 3}
-             (store/pull db '[*] [:name "Angela"]))))))
+             (store/pull db '[*] [:name "Angela"])))
+
+      (testing "it composes with pull"
+        (let [with-db (store/db-with @conn
+                                     [{:db/id [:name "Angela"] :age 77}])]
+          (is (= 77 (:age (store/pull with-db '[:age] [:name "Angela"])))))))))
 
 
 (deftest test-datahike-plugin
@@ -122,6 +131,15 @@
                                ;; pass a literal date here
                                :params {:as-of "2020-01-01 00:00:00 PDT"}})]
         (is (instance? datahike.db.AsOfDB (bread/hook response :hook/datastore)))))
+
+    (testing ":hook/datastore.req->timepoint honors as-of-format config"
+      (let [handler (config->handler (assoc config :as-of-format "yyyy-MM-dd"))
+            response (handler {:url "/"
+                               ;; pass a literal date here
+                               :params {:as-of "2020-01-01"}})]
+        (is (instance? datahike.db.AsOfDB (bread/hook response :hook/datastore)))))
+
+    (testing ":hook/datastore honors as-of-tx")
 
     (testing ":hook/datastore.req->timepoint gracefully handles bad date strings"
       (let [handler (config->handler config)
